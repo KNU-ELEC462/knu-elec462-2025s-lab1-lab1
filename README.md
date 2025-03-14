@@ -1,5 +1,12 @@
 # Lab #1 (Total 10 points)
 
+## Basic Setup 
+Before starting the lab, install the required development tools by running the following commands:
+```sh
+$ sudo apt update
+$ sudo apt install -y build-essential strace
+```
+
 ## Lab #1-1: Writing who3 (2 points)
 ### Instructions
 - Implement who3.c & utmplib.c as discussed in the lecture.

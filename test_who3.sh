@@ -1,17 +1,24 @@
 #!/bin/bash
 
-TEST_DIR="$(dirname `realpath $0`)"
-cd $TEST_DIR
-
-REFERENCE_BINARY="./who3_ref"
 TEST_BINARY="./who3"
+TEST_INPUT="./test_utmp"
 SOURCE_FILES="who3.c utmplib.c"
-REF_OUTPUT="ref_output.txt"
+REF_OUTPUT="who3_ref_output.txt"
 TEST_OUTPUT="test_output.txt"
+
+# Required tools check
+REQUIRED_TOOLS=("gcc" "strace")
+for tool in "${REQUIRED_TOOLS[@]}"; do
+    if ! command -v $tool &> /dev/null; then
+        echo "ERROR: '$tool' is not installed. Please install it before running the script."
+	echo "HINT: sudo apt update; sudo apt install -y $tool"
+        exit 1
+    fi
+done
 
 # Cleanup function to remove temporary files
 cleanup() {
-    rm -f "$REF_OUTPUT" "$TEST_OUTPUT"
+    rm -f "$TEST_OUTPUT"
 }
 # Ensure cleanup runs on exit (normal or error)
 trap cleanup EXIT
@@ -24,27 +31,21 @@ for file in $SOURCE_FILES; do
     fi
 done
 
-# Compile the test binary statically
-gcc -static -o $TEST_BINARY $SOURCE_FILES 
+# Compile the test binary
+gcc -o $TEST_BINARY $SOURCE_FILES 
 if [ $? -ne 0 ]; then
     echo "ERROR: Compilation failed."
     exit 1
 fi
 
-# Check if reference and test binaries exist
-if [ ! -f "$REFERENCE_BINARY" ]; then
-    echo "ERROR: Reference binary ($REFERENCE_BINARY) not found."
-    exit 1
-fi
-
+# Check if test binaries exist
 if [ ! -f "$TEST_BINARY" ]; then
     echo "ERROR: Test binary ($TEST_BINARY) not found after compilation."
     exit 1
 fi
 
-# Run both binaries and compare output
-$REFERENCE_BINARY > "$REF_OUTPUT"
-$TEST_BINARY > "$TEST_OUTPUT"
+# Run test binary and compare output
+$TEST_BINARY $TEST_INPUT > "$TEST_OUTPUT"
 
 if ! diff -q "$REF_OUTPUT" "$TEST_OUTPUT" > /dev/null; then
     echo "FAILED: Output differs from the reference."
@@ -52,8 +53,8 @@ if ! diff -q "$REF_OUTPUT" "$TEST_OUTPUT" > /dev/null; then
 fi
 
 # Check the number of 'read' system calls using strace
-REF_READ_COUNT=$(strace -c $REFERENCE_BINARY 2>&1 | grep -w read | awk '{print $4}')
-TEST_READ_COUNT=$(strace -c $TEST_BINARY 2>&1 | grep -w read | awk '{print $4}')
+REF_READ_COUNT="5"
+TEST_READ_COUNT=$(strace -c $TEST_BINARY $TEST_INPUT 2>&1 | grep -w read | awk '{print $4}')
 
 if [ "$REF_READ_COUNT" -ne "$TEST_READ_COUNT" ]; then
     echo "FAILED: read() system call count differs."
